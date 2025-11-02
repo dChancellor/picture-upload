@@ -44,16 +44,8 @@ export const POST = async ({ request }) => {
 		try {
 			const origin = new URL(request.url).origin;
 			const fullUrl = `${origin}${publicPath}`;
-			// Discord webhook payload with embed image
 			const payload = {
 				content: 'A new image was uploaded',
-				embeds: [
-					{
-						title: safeName,
-						url: fullUrl,
-						image: { url: fullUrl }
-					}
-				]
 			};
 
 			await fetch(webhook, {
