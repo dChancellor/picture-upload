@@ -1,8 +1,42 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
+
 	let chosen: HTMLInputElement | null = null;
 	let uploading = false;
 	let message = '';
 	let uploadedPath = '';
+	// previewUrl will contain either a blob: URL for the locally selected file
+	// or the server path after a successful upload. We revoke blob URLs when
+	// they're replaced or when the component is destroyed.
+	let previewUrl = '';
+
+	function revokePreview() {
+		try {
+			if (previewUrl && previewUrl.startsWith('blob:')) {
+				URL.revokeObjectURL(previewUrl);
+			}
+		} catch (e) {
+			// ignore revoke errors
+		}
+	}
+
+	function onFileChange(e: Event) {
+		const input = e.target as HTMLInputElement;
+		const file = input?.files?.[0];
+		// if user starts a new browse/selection, clear prior success message
+		if (message === 'Upload successful') message = '';
+		if (!file) {
+			revokePreview();
+			previewUrl = '';
+			return;
+		}
+		// revoke previous local preview if any
+		revokePreview();
+		// show immediate preview using an object URL
+		previewUrl = URL.createObjectURL(file);
+		// clear any previous uploaded path while user is selecting a new file
+		uploadedPath = '';
+	}
 
 	async function onSubmit(e: SubmitEvent) {
 		e.preventDefault();
@@ -32,13 +66,44 @@
 
 		message = 'Upload successful';
 		uploadedPath = j.path;
+
+		// keep the success message, but reset the rest of the UI state so the
+		// form appears cleared after a successful upload
+		// revoke any local blob preview and clear the preview/showed path
+		revokePreview();
+		previewUrl = '';
+		uploadedPath = '';
+
+		// clear the file input so it's ready for a new selection
+		if (chosen) {
+			try {
+				chosen.value = '';
+			} catch (e) {
+				// some browsers may restrict assigning to value; ignore failures
+			}
+		}
 	}
+
+	onDestroy(() => {
+		revokePreview();
+	});
 </script>
 
-<h1>Image Upload</h1>
+{#if message}
+	<p class="message">{message}</p>
+{/if}
 
+<h1>Upload your image</h1>
 <form on:submit|preventDefault={onSubmit}>
-	<input bind:this={chosen} type="file" accept="image/*" />
+	<input
+		bind:this={chosen}
+		type="file"
+		accept="image/*"
+		on:change={onFileChange}
+		on:click={() => {
+			if (message === 'Upload successful') message = '';
+		}}
+	/>
 	<div style="height:12px"></div>
 	<button type="submit" disabled={uploading}>
 		{#if uploading}Uploading...{/if}
@@ -46,14 +111,10 @@
 	</button>
 </form>
 
-{#if message}
-	<p>{message}</p>
-{/if}
-
-{#if uploadedPath}
+{#if previewUrl}
 	<h3>Preview</h3>
 	<img
-		src={uploadedPath}
+		src={previewUrl}
 		alt="uploaded"
 		style="max-width:100%;border-radius:8px;border:1px solid rgba(255,255,255,0.04)"
 	/>
@@ -89,5 +150,8 @@
 	img {
 		margin-top: 1rem;
 		display: block;
+	}
+	.message {
+		color: green;
 	}
 </style>

@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs';
 import path from 'path';
+import { env } from '$env/dynamic/private';
 
 const uploadsDir = path.resolve('static/uploads');
 
@@ -33,6 +34,38 @@ export const POST = async ({ request }) => {
 	}
 
 	const publicPath = `/uploads/${safeName}`;
+
+	// try to notify Discord via webhook (if configured). Use a best-effort
+	// approach: don't fail the upload if the webhook request fails.
+	(async () => {
+		const webhook = env.DISCORD_WEBHOOK_URL;
+		if (!webhook) return;
+
+		try {
+			const origin = new URL(request.url).origin;
+			const fullUrl = `${origin}${publicPath}`;
+			// Discord webhook payload with embed image
+			const payload = {
+				content: 'A new image was uploaded',
+				embeds: [
+					{
+						title: safeName,
+						url: fullUrl,
+						image: { url: fullUrl }
+					}
+				]
+			};
+
+			await fetch(webhook, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(payload)
+			});
+		} catch (e) {
+			// ignore webhook errors — not critical to upload
+			console.error('Discord webhook failed', e);
+		}
+	})();
 
 	return new Response(JSON.stringify({ ok: true, path: publicPath, name: safeName }), {
 		status: 200

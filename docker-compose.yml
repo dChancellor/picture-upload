@@ -3,9 +3,12 @@ services:
   web:
     build: .
     ports:
-      - '3000:3000'
+      - '5173:3000'
+    env_file:
+      - .env
     environment:
-      - PORT=3000
+      - BODY_SIZE_LIMIT=25M
+      - DISCORD_WEBHOOK_URL
     volumes:
-      - ./pictures:/app/static/uploads
+      - /mnt/Pictures:/app/static/uploads
     restart: unless-stopped
